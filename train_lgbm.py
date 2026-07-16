@@ -1,18 +1,60 @@
 import scipy.io
 import numpy as np
 import lightgbm as lgb
+from sklearn.linear_model import Ridge
+from sklearn.ensemble import StackingRegressor
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 
+# Load data
 data = scipy.io.loadmat('/home/hzy9981/datax/dataX.mat')
-X_train = data['inputtrain']
-y_train = data['outputtrain'].flatten()
-X_test = data['inputtest']
-y_test = data['outputtest'].flatten()
+X_raw = data['inputtrain'].flatten()
+y_raw = data['outputtrain'].flatten()
 
-model = lgb.LGBMRegressor(n_estimators=1000, learning_rate=0.05, num_leaves=127, random_state=42)
-model.fit(X_train, y_train)
+def create_features(x, y):
+    # Lags and Rolling stats
+    features = [x]
+    for lag in [1, 2, 3, 5]:
+        shifted = np.roll(x, lag)
+        shifted[:lag] = x[0]
+        features.append(shifted)
+    
+    # Rolling mean/std
+    for window in [3, 5, 10]:
+        cumsum = np.cumsum(np.insert(x, 0, 0)) 
+        moving_avg = (cumsum[window:] - cumsum[:-window]) / window
+        moving_avg = np.pad(moving_avg, (window-1, 0), 'constant', constant_values=x[0])
+        features.append(moving_avg)
 
-y_pred = model.predict(X_test)
+    return np.column_stack(features)
+
+X = create_features(X_raw, y_raw)
+y = y_raw
+
+# Split
+split = int(len(X) * 0.8)
+X_train, X_test = X[:split], X[split:]
+y_train, y_test = y[:split], y[split:]
+
+# Scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Ensemble
+estimators = [
+    ('lgbm', lgb.LGBMRegressor(n_estimators=1000, learning_rate=0.05, num_leaves=63, random_state=42)),
+    ('ridge', Ridge(alpha=1.0))
+]
+model = StackingRegressor(
+    estimators=estimators,
+    final_estimator=Ridge()
+)
+
+model.fit(X_train_scaled, y_train)
+
+# Predict
+y_pred = model.predict(X_test_scaled)
 rmse = np.sqrt(mean_squared_error(y_test, y_pred))
 
-print(f"LightGBM RMSE: {rmse:.6f}")
+print(f"Stacking Ensemble RMSE: {rmse:.6f}")
