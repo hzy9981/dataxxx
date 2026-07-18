@@ -81,16 +81,16 @@ x = layers.BatchNormalization()(x)
 outputs = layers.Conv2D(1, 3, padding='same')(x)
 model = keras.Model(inputs, outputs)
 
-model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.001), loss='mse')
+model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.0005), loss='mse')
 
 # 5. Training
 print("Starting patch-based training with augmentation...")
 callbacks = [
-    keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1),
-    keras.callbacks.EarlyStopping(monitor='loss', patience=15, restore_best_weights=True)
+    keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5, patience=20, min_lr=1e-6, verbose=1),
+    keras.callbacks.EarlyStopping(monitor='loss', patience=50, restore_best_weights=True)
 ]
 
-model.fit(train_dataset, epochs=100, callbacks=callbacks)
+model.fit(train_dataset, epochs=5000, callbacks=callbacks)
 
 # 6. Evaluation on Full Image (Inference)
 def predict_full_image(model, full_image_scaled):
