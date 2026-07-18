@@ -57,7 +57,8 @@ train_dataset = tf.data.Dataset.from_tensor_slices((X_train_patches, y_train_pat
 train_dataset = train_dataset.shuffle(1000).map(augment).batch(32).prefetch(tf.data.AUTOTUNE)
 
 # 4. Model Architecture (Deeper with Skip Connections)
-inputs = layers.Input(shape=(PATCH_SIZE, PATCH_SIZE, 1))
+# Using (None, None, 1) to allow the model to handle both 64x64 patches and 500x500 full images
+inputs = layers.Input(shape=(None, None, 1))
 x = layers.Conv2D(64, 3, padding='same', activation='relu')(inputs)
 x = layers.BatchNormalization()(x)
 
@@ -92,13 +93,13 @@ callbacks = [
 model.fit(train_dataset, epochs=100, callbacks=callbacks)
 
 # 6. Evaluation on Full Image (Inference)
-def predict_full_image(model, full_image_scaled, patch_size=64):
-    # For simplicity, we just predict the whole image if the model supports variable input size
-    # or handle tiling. Since it's Fully Convolutional, we can pass the whole image.
+def predict_full_image(model, full_image_scaled):
+    # Full Image Inference
     h, w = full_image_scaled.shape
     input_tensor = full_image_scaled.reshape(1, h, w, 1)
     prediction = model.predict(input_tensor, verbose=0)
-    return prediction.reshape(h, w)
+    # Result will be (1, H, W, 1), squeeze to (H, W)
+    return np.squeeze(prediction)
 
 print("\nFinal Evaluation...")
 y_pred_res_train = predict_full_image(model, X_scaled_full)
